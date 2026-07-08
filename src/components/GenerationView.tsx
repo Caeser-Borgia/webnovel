@@ -5,6 +5,7 @@ import type { GenerationStatus } from "@/types";
 
 interface GenerationViewProps {
   bookTitle: string;
+  chapterTitle: string;
   content: string;
   error: string | null;
   isGenerating: boolean;
@@ -20,10 +21,13 @@ interface GenerationViewProps {
   onDownloadTxt: () => void;
   onPause: () => void;
   onRestart: () => void;
+  onDownloadChapter?: () => Promise<void>;
+  onDownloadBook?: () => Promise<void>;
 }
 
 export function GenerationView({
   bookTitle,
+  chapterTitle,
   content,
   error,
   isGenerating,
@@ -39,6 +43,8 @@ export function GenerationView({
   onDownloadTxt,
   onPause,
   onRestart,
+  onDownloadChapter,
+  onDownloadBook,
 }: GenerationViewProps) {
   const contentRef = useRef<HTMLDivElement | null>(null);
 
@@ -77,6 +83,7 @@ export function GenerationView({
           <h2 className="mt-2 text-3xl font-semibold text-slate-900">
             {bookTitle ? `《${bookTitle}》` : "正在创作"}
           </h2>
+          <p className="mt-1 text-sm font-medium text-amber-800">{chapterTitle}</p>
           <p className="mt-3 text-sm leading-7 text-slate-600">
             {isGenerating && "流式生成中，请稍候..."}
             {status === "paused" && "已暂停生成，可以继续创作或重新开始"}
@@ -127,70 +134,100 @@ export function GenerationView({
         </div>
       </div>
 
-      <div className="mt-6 flex flex-wrap gap-3">
-        <button
-          className="rounded-full border border-amber-900/15 bg-white px-5 py-3 text-sm font-medium text-slate-700 transition hover:border-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
-          disabled={!isGenerating}
-          type="button"
-          onClick={onPause}
-        >
-          ⏸ 暂停
-        </button>
-        {shouldShowContinue && (
+      <div className="mt-6 space-y-3">
+        <div className="flex flex-wrap gap-3">
           <button
-            className="rounded-full border border-amber-500 bg-amber-50 px-5 py-3 text-sm font-medium text-amber-900 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-full border border-amber-900/15 bg-white px-5 py-3 text-sm font-medium text-slate-700 transition hover:border-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={!isGenerating}
+            type="button"
+            onClick={onPause}
+          >
+            ⏸ 暂停
+          </button>
+          {shouldShowContinue && (
+            <button
+              className="rounded-full border border-amber-500 bg-amber-50 px-5 py-3 text-sm font-medium text-amber-900 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={isGenerating}
+              type="button"
+              onClick={() => {
+                void onContinue();
+              }}
+            >
+              ▶ 继续创作
+            </button>
+          )}
+          <button
+            className="rounded-full bg-slate-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
             disabled={isGenerating}
             type="button"
+            onClick={onRestart}
+          >
+            🔄 重新开始本章
+          </button>
+          <button
+            className="rounded-full border border-amber-900/15 bg-white px-5 py-3 text-sm font-medium text-slate-700 transition hover:border-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={!content}
+            type="button"
             onClick={() => {
-              void onContinue();
+              void onCopy();
             }}
           >
-            ▶ 继续创作
+            📋 复制
           </button>
+          <button
+            className="rounded-full border border-amber-900/15 bg-white px-5 py-3 text-sm font-medium text-slate-700 transition hover:border-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={!content}
+            type="button"
+            onClick={onDownloadTxt}
+          >
+            📥 TXT
+          </button>
+          <button
+            className="rounded-full border border-amber-900/15 bg-white px-5 py-3 text-sm font-medium text-slate-700 transition hover:border-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={!content}
+            type="button"
+            onClick={() => {
+              void onDownloadDocx();
+            }}
+          >
+            📄 DOCX
+          </button>
+          <button
+            className="ml-auto rounded-full border border-amber-900/15 bg-white px-5 py-3 text-sm font-medium text-slate-700 transition hover:border-amber-400"
+            type="button"
+            onClick={onBack}
+          >
+            ← 返回设定
+          </button>
+        </div>
+
+        {(onDownloadChapter || onDownloadBook) && (
+          <div className="flex flex-wrap gap-3">
+            {onDownloadChapter && (
+              <button
+                className="rounded-full border border-amber-900/15 bg-white px-5 py-3 text-sm font-medium text-slate-700 transition hover:border-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={!content}
+                onClick={() => {
+                  void onDownloadChapter();
+                }}
+                type="button"
+              >
+                💾 导出当前章节
+              </button>
+            )}
+            {onDownloadBook && (
+              <button
+                className="rounded-full border border-amber-900/15 bg-white px-5 py-3 text-sm font-medium text-slate-700 transition hover:border-amber-400"
+                onClick={() => {
+                  void onDownloadBook();
+                }}
+                type="button"
+              >
+                📚 导出全书
+              </button>
+            )}
+          </div>
         )}
-        <button
-          className="rounded-full bg-slate-900 px-5 py-3 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-          disabled={isGenerating}
-          type="button"
-          onClick={onRestart}
-        >
-          🔄 重新开始本章
-        </button>
-        <button
-          className="rounded-full border border-amber-900/15 bg-white px-5 py-3 text-sm font-medium text-slate-700 transition hover:border-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
-          disabled={!content}
-          type="button"
-          onClick={() => {
-            void onCopy();
-          }}
-        >
-          📋 复制
-        </button>
-        <button
-          className="rounded-full border border-amber-900/15 bg-white px-5 py-3 text-sm font-medium text-slate-700 transition hover:border-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
-          disabled={!content}
-          type="button"
-          onClick={onDownloadTxt}
-        >
-          📥 TXT
-        </button>
-        <button
-          className="rounded-full border border-amber-900/15 bg-white px-5 py-3 text-sm font-medium text-slate-700 transition hover:border-amber-400 disabled:cursor-not-allowed disabled:opacity-50"
-          disabled={!content}
-          type="button"
-          onClick={() => {
-            void onDownloadDocx();
-          }}
-        >
-          📄 DOCX
-        </button>
-        <button
-          className="ml-auto rounded-full border border-amber-900/15 bg-white px-5 py-3 text-sm font-medium text-slate-700 transition hover:border-amber-400"
-          type="button"
-          onClick={onBack}
-        >
-          ← 返回设定
-        </button>
       </div>
     </div>
   );

@@ -147,6 +147,7 @@ export default function Home() {
           {step === "generation" && (
             <GenerationView
               bookTitle={story.bookTitle}
+              chapterTitle="第一章"
               content={generation.content}
               error={generation.error}
               isGenerating={generation.isGenerating}
