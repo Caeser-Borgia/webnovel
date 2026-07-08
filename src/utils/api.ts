@@ -1,9 +1,11 @@
 import type {
+  CharacterCard,
   ChapterData,
   DraftSnapshot,
   GenerateRequestBody,
   GenerationMode,
   ModelPreset,
+  PlotPoint,
   StorySetupData,
   WriterConfig,
 } from "@/types";
@@ -118,6 +120,8 @@ export function createGenerateRequest(
   story: StorySetupData,
   chapter: ChapterData,
   generationMode: GenerationMode,
+  characters?: CharacterCard[],
+  plots?: PlotPoint[],
 ): GenerateRequestBody {
   return {
     ...config,
@@ -127,6 +131,8 @@ export function createGenerateRequest(
     currentWordCount: chapter.wordCount,
     generationMode,
     previousContent: chapter.content,
+    characters,
+    plots,
   };
 }
 

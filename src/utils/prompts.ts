@@ -1,4 +1,4 @@
-import type { GenerateRequestBody, NovelStyle, StorySetupData } from "@/types";
+import type { CharacterCard, GenerateRequestBody, NovelStyle, PlotPoint, StorySetupData } from "@/types";
 
 const STYLE_SYSTEM_PROMPTS: Record<NovelStyle, string> = {
   网文: `你是一名擅长创作长篇网文的职业作者。
@@ -48,6 +48,48 @@ function getRoundGoal(targetWords: number, currentWordCount: number) {
   return `当前章节目标总字数为 ${targetWords} 字，当前已写 ${currentWordCount} 字。本轮请优先新增约 ${suggestedWords} 字，宁可自然收束，也不要生硬凑字数。`;
 }
 
+function buildCharacterContext(characters: CharacterCard[] | undefined) {
+  if (!characters || characters.length === 0) {
+    return "";
+  }
+
+  const charLines = characters.map((char) => {
+    const parts = [
+      char.name,
+      `(${char.role})`,
+      char.description.slice(0, 60),
+      char.status ? `当前：${char.status.slice(0, 40)}` : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+
+    return `  • ${parts}`;
+  });
+
+  return "主要角色状态：\n" + charLines.join("\n");
+}
+
+function buildPlotContext(plots: PlotPoint[] | undefined) {
+  if (!plots || plots.length === 0) {
+    return "";
+  }
+
+  const unresolvedPlots = plots.filter((p) => !p.resolved);
+  if (unresolvedPlots.length === 0) {
+    return "";
+  }
+
+  const plotLines = unresolvedPlots.slice(0, 8).map((p) => {
+    const label = `[${p.type}]`;
+    const desc = p.description.slice(0, 50);
+    const chapter = p.chapter ? `（${p.chapter}出现）` : "";
+    return `  • ${label} ${p.title}${chapter} - ${desc}`;
+  });
+
+  return "未回收伏笔/情节点：\n" + plotLines.join("\n");
+}
+
+
 export function buildChapterSummary(
   story: StorySetupData,
   chapterTitle: string,
@@ -70,7 +112,7 @@ function buildStoryStateSummary(body: GenerateRequestBody) {
     ? body.chapterSummary.trim()
     : buildChapterSummary(body, body.chapterTitle, body.previousContent);
 
-  return [
+  const parts = [
     formatField("书名", body.bookTitle, 80),
     formatField("章节标题", body.chapterTitle, 80),
     formatField("主角", body.mainCharacter, 120),
@@ -84,9 +126,21 @@ function buildStoryStateSummary(body: GenerateRequestBody) {
     formatField("开篇目标", body.openingGoal, 180),
     formatField("文风补充要求", body.styleNotes, 180),
     formatField("本章状态摘要", chapterSummary, 400),
-  ]
-    .filter(Boolean)
-    .join("\n");
+  ].filter(Boolean);
+
+  // 添加角色上下文
+  const characterContext = buildCharacterContext(body.characters);
+  if (characterContext) {
+    parts.push(characterContext);
+  }
+
+  // 添加伏笔上下文
+  const plotContext = buildPlotContext(body.plots);
+  if (plotContext) {
+    parts.push(plotContext);
+  }
+
+  return parts.join("\n");
 }
 
 export function getNovelPrompt(body: GenerateRequestBody) {

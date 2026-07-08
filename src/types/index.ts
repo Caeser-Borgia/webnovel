@@ -32,6 +32,24 @@ export interface StorySetupData {
   styleNotes: string;
 }
 
+export interface CharacterCard {
+  id: string;
+  name: string;
+  role: "主角" | "主配角" | "重要配角" | "其他";
+  description: string;
+  status: string;
+  relationships: string; // 与其他角色的关系
+}
+
+export interface PlotPoint {
+  id: string;
+  title: string;
+  type: "大纲" | "伏笔" | "情节" | "悬念";
+  description: string;
+  resolved: boolean;
+  chapter: string;
+}
+
 export interface ModelPreset {
   label: string;
   url: string;
@@ -44,6 +62,8 @@ export interface GenerateRequestBody extends WriterConfig, StorySetupData {
   chapterSummary: string;
   currentWordCount: number;
   generationMode: GenerationMode;
+  characters?: CharacterCard[];
+  plots?: PlotPoint[];
 }
 
 export interface ChapterData {
@@ -75,4 +95,6 @@ export interface StoredProjectData {
   chapters: ChapterData[];
   activeChapterId: string | null;
   snapshots: DraftSnapshot[];
+  characters?: CharacterCard[];
+  plots?: PlotPoint[];
 }

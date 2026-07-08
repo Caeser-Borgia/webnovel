@@ -19,7 +19,7 @@ import {
   STORAGE_KEYS,
 } from "@/utils/api";
 import { buildChapterSummary } from "@/utils/prompts";
-import type { AppStep, ChapterData, DraftSnapshot, GenerationMode, StoredProjectData, StorySetupData, WriterConfig } from "@/types";
+import type { AppStep, CharacterCard, ChapterData, DraftSnapshot, GenerationMode, PlotPoint, StoredProjectData, StorySetupData, WriterConfig } from "@/types";
 
 const steps: Array<{ key: AppStep; label: string }> = [
   { key: "config", label: "配置" },
@@ -71,18 +71,24 @@ export default function Home() {
   const [chapters, setChapters] = useState<ChapterData[]>([]);
   const [activeChapterId, setActiveChapterId] = useState<string | null>(null);
   const [snapshots, setSnapshots] = useState<DraftSnapshot[]>([]);
+  const [characters, setCharacters] = useState<CharacterCard[]>([]);
+  const [plots, setPlots] = useState<PlotPoint[]>([]);
   const generation = useNovelGeneration();
 
   const configRef = useRef(config);
   const storyRef = useRef(story);
   const chaptersRef = useRef(chapters);
   const activeChapterIdRef = useRef(activeChapterId);
+  const charactersRef = useRef(characters);
+  const plotsRef = useRef(plots);
   const activeRunIdRef = useRef(0);
 
   configRef.current = config;
   storyRef.current = story;
   chaptersRef.current = chapters;
   activeChapterIdRef.current = activeChapterId;
+  charactersRef.current = characters;
+  plotsRef.current = plots;
 
   useEffect(() => {
     const savedConfig = window.localStorage.getItem(STORAGE_KEYS.config);
@@ -109,6 +115,14 @@ export default function Home() {
       setChapters(nextChapters);
       setSnapshots(nextSnapshots);
       setActiveChapterId(parsed.activeChapterId || nextChapters[0]?.id || null);
+
+      if (Array.isArray(parsed.characters)) {
+        setCharacters(parsed.characters);
+      }
+
+      if (Array.isArray(parsed.plots)) {
+        setPlots(parsed.plots);
+      }
     }
   }, []);
 
@@ -127,9 +141,11 @@ export default function Home() {
         chapters,
         activeChapterId,
         snapshots,
+        characters,
+        plots,
       } satisfies StoredProjectData),
     );
-  }, [activeChapterId, chapters, snapshots]);
+  }, [activeChapterId, chapters, snapshots, characters, plots]);
 
   useEffect(() => {
     if (!chapters.length) {
@@ -282,7 +298,14 @@ export default function Home() {
     let nextMode = mode;
 
     while (true) {
-      const payload = createGenerateRequest(configRef.current, storyRef.current, workingChapter, nextMode);
+      const payload = createGenerateRequest(
+        configRef.current,
+        storyRef.current,
+        workingChapter,
+        nextMode,
+        charactersRef.current,
+        plotsRef.current,
+      );
       const result = await generation.startGeneration(payload, {
         initialContent: workingChapter.content,
         mode: nextMode,
