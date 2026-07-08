@@ -1,51 +1,118 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Document, Packer, Paragraph } from "docx";
+import { Document, HeadingLevel, Packer, Paragraph } from "docx";
 import { saveAs } from "file-saver";
-import type { GenerateRequestBody, GenerationStatus } from "@/types";
-import { sanitizeFileName, countWords } from "@/utils/api";
+import type { GenerateRequestBody, GenerationMode, GenerationStatus } from "@/types";
+import { countWords, sanitizeFileName } from "@/utils/api";
+
+interface GenerationOptions {
+  initialContent: string;
+  mode: GenerationMode;
+  replaceContent: boolean;
+}
+
+interface GenerationResult {
+  status: Exclude<GenerationStatus, "idle" | "generating">;
+  content: string;
+  addedWords: number;
+  error: string | null;
+}
+
+interface ExportSection {
+  title: string;
+  content: string;
+}
+
+interface ChapterStateSnapshot {
+  content: string;
+  error: string | null;
+  status: GenerationStatus;
+  lastStartedAt: string | null;
+  lastCompletedAt: string | null;
+  lastGenerationMode: GenerationMode;
+  lastDeltaWords: number;
+}
+
+function buildDocParagraphs(sections: ExportSection[]) {
+  return sections.flatMap((section) => {
+    const paragraphs: Paragraph[] = [];
+
+    if (section.title.trim()) {
+      paragraphs.push(
+        new Paragraph({
+          text: section.title.trim(),
+          heading: HeadingLevel.HEADING_1,
+        }),
+      );
+    }
+
+    const content = section.content.trim();
+    const body = content
+      ? content.split(/\n+/).map((paragraph) => new Paragraph(paragraph))
+      : [new Paragraph("暂无内容")];
+
+    paragraphs.push(...body);
+    return paragraphs;
+  });
+}
 
 export function useNovelGeneration() {
   const [content, setContent] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
   const [status, setStatus] = useState<GenerationStatus>("idle");
-  const [lastDeltaWords, setLastDeltaWords] = useState(0);
+  const [currentMode, setCurrentMode] = useState<GenerationMode>("start");
   const [lastStartedAt, setLastStartedAt] = useState<string | null>(null);
   const [lastCompletedAt, setLastCompletedAt] = useState<string | null>(null);
+  const [lastDeltaWords, setLastDeltaWords] = useState(0);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const contentRef = useRef("");
+  const stopRequestedRef = useRef(false);
 
-  const isGenerating = status === "generating";
+  const loadChapterState = (snapshot: ChapterStateSnapshot) => {
+    contentRef.current = snapshot.content;
+    setContent(snapshot.content);
+    setError(snapshot.error);
+    setStatus(snapshot.status === "generating" ? "paused" : snapshot.status);
+    setCurrentMode(snapshot.lastGenerationMode);
+    setLastStartedAt(snapshot.lastStartedAt);
+    setLastCompletedAt(snapshot.lastCompletedAt);
+    setLastDeltaWords(snapshot.lastDeltaWords);
+    setIsGenerating(false);
+  };
 
   const pauseGeneration = () => {
+    stopRequestedRef.current = true;
     abortControllerRef.current?.abort();
     abortControllerRef.current = null;
+    setIsGenerating(false);
     setStatus("paused");
   };
 
-  const resetContent = () => {
-    setContent("");
+  const startGeneration = async (
+    payload: GenerateRequestBody,
+    options: GenerationOptions,
+  ): Promise<GenerationResult> => {
+    abortControllerRef.current?.abort();
+    stopRequestedRef.current = false;
     setError(null);
-    setStatus("idle");
+    setCurrentMode(options.mode);
     setLastDeltaWords(0);
-    setLastStartedAt(null);
-    setLastCompletedAt(null);
-  };
 
-  const performGeneration = async (payload: GenerateRequestBody, appendMode: boolean) => {
-    const now = new Date().toISOString();
-    setLastStartedAt(now);
+    const baseContent = options.replaceContent ? "" : options.initialContent;
+    contentRef.current = baseContent;
+    setContent(baseContent);
 
-    if (!appendMode) {
-      setContent("");
-    }
-
-    setError(null);
+    const baseWordCount = countWords(baseContent);
+    setLastStartedAt(new Date().toISOString());
     setStatus("generating");
-    setLastDeltaWords(0);
+    setIsGenerating(true);
 
     const controller = new AbortController();
     abortControllerRef.current = controller;
+    let nextStatus: GenerationResult["status"] = "completed";
+    let nextError: string | null = null;
 
     try {
       const response = await fetch("/api/generate", {
@@ -65,7 +132,6 @@ export function useNovelGeneration() {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
-      let deltaWords = 0;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -88,11 +154,8 @@ export function useNovelGeneration() {
           const data = trimmed.slice(5).trim();
 
           if (data === "[DONE]") {
-            setStatus("completed");
-            setLastDeltaWords(deltaWords);
-            setLastCompletedAt(new Date().toISOString());
-            abortControllerRef.current = null;
-            return;
+            nextStatus = stopRequestedRef.current ? "paused" : "completed";
+            break;
           }
 
           const parsed = JSON.parse(data) as { error?: string; text?: string };
@@ -102,82 +165,95 @@ export function useNovelGeneration() {
           }
 
           if (parsed.text) {
-            deltaWords += countWords(parsed.text);
-            setContent((current) => current + parsed.text);
+            const nextContent = `${contentRef.current}${parsed.text}`;
+            contentRef.current = nextContent;
+            setContent(nextContent);
           }
         }
       }
     } catch (caughtError) {
       if (caughtError instanceof DOMException && caughtError.name === "AbortError") {
-        setError(null);
+        nextStatus = "paused";
       } else {
-        const errorMsg = caughtError instanceof Error ? caughtError.message : "生成过程中发生未知错误。";
-        setError(errorMsg);
-        setStatus("error");
+        nextStatus = "error";
+        nextError = caughtError instanceof Error ? caughtError.message : "生成过程中发生未知错误。";
+        setError(nextError);
       }
     } finally {
       abortControllerRef.current = null;
-      if (status === "generating") {
-        setStatus("completed");
-      }
+      setIsGenerating(false);
+      setStatus(nextStatus);
+      setLastCompletedAt(new Date().toISOString());
     }
+
+    const addedWords = Math.max(countWords(contentRef.current) - baseWordCount, 0);
+    setLastDeltaWords(addedWords);
+
+    return {
+      status: nextStatus,
+      content: contentRef.current,
+      addedWords,
+      error: nextError,
+    };
   };
 
-  const startGeneration = async (payload: GenerateRequestBody) => {
-    await performGeneration(payload, false);
-  };
-
-  const continueGeneration = async (payload: GenerateRequestBody) => {
-    await performGeneration(payload, true);
-  };
-
-  const copyContent = async () => {
-    if (!content) {
+  const copyText = async (value: string) => {
+    if (!value.trim()) {
       return;
     }
 
-    await navigator.clipboard.writeText(content);
+    await navigator.clipboard.writeText(value);
   };
 
-  const downloadTxt = (bookTitle: string) => {
-    if (!content) {
+  const downloadTxt = (fileName: string, value: string) => {
+    if (!value.trim()) {
       return;
     }
 
-    const fileName = `${sanitizeFileName(bookTitle)}.txt`;
-    const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
-    saveAs(blob, fileName);
+    const blob = new Blob([value], { type: "text/plain;charset=utf-8" });
+    saveAs(blob, `${sanitizeFileName(fileName)}.txt`);
   };
 
-  const downloadDocx = async (bookTitle: string) => {
-    if (!content) {
+  const downloadMarkdown = (fileName: string, value: string) => {
+    if (!value.trim()) {
+      return;
+    }
+
+    const blob = new Blob([value], { type: "text/markdown;charset=utf-8" });
+    saveAs(blob, `${sanitizeFileName(fileName)}.md`);
+  };
+
+  const downloadDocx = async (fileName: string, sections: ExportSection[]) => {
+    if (!sections.some((section) => section.content.trim())) {
       return;
     }
 
     const doc = new Document({
       sections: [
         {
-          children: content.split(/\n+/).map((paragraph) => new Paragraph(paragraph)),
+          children: buildDocParagraphs(sections),
         },
       ],
     });
+
     const blob = await Packer.toBlob(doc);
-    saveAs(blob, `${sanitizeFileName(bookTitle)}.docx`);
+    saveAs(blob, `${sanitizeFileName(fileName)}.docx`);
   };
 
   return {
     content,
-    copyContent,
-    continueGeneration,
+    copyText,
+    currentMode,
     downloadDocx,
+    downloadMarkdown,
     downloadTxt,
     error,
     isGenerating,
     lastCompletedAt,
     lastDeltaWords,
     lastStartedAt,
+    loadChapterState,
     pauseGeneration,
-    resetContent,
     startGeneration,
     status,
     wordCount: countWords(content),
