@@ -3,30 +3,46 @@
 import { useRef, useState } from "react";
 import { Document, Packer, Paragraph } from "docx";
 import { saveAs } from "file-saver";
-import type { GenerateRequestBody } from "@/types";
-import { sanitizeFileName } from "@/utils/api";
-
-function countWords(content: string) {
-  return content.replace(/\s/g, "").length;
-}
+import type { GenerateRequestBody, GenerationStatus } from "@/types";
+import { sanitizeFileName, countWords } from "@/utils/api";
 
 export function useNovelGeneration() {
   const [content, setContent] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [status, setStatus] = useState<GenerationStatus>("idle");
+  const [lastDeltaWords, setLastDeltaWords] = useState(0);
+  const [lastStartedAt, setLastStartedAt] = useState<string | null>(null);
+  const [lastCompletedAt, setLastCompletedAt] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+
+  const isGenerating = status === "generating";
 
   const pauseGeneration = () => {
     abortControllerRef.current?.abort();
     abortControllerRef.current = null;
-    setIsGenerating(false);
+    setStatus("paused");
   };
 
-  const startGeneration = async (payload: GenerateRequestBody) => {
-    pauseGeneration();
-    setError(null);
+  const resetContent = () => {
     setContent("");
-    setIsGenerating(true);
+    setError(null);
+    setStatus("idle");
+    setLastDeltaWords(0);
+    setLastStartedAt(null);
+    setLastCompletedAt(null);
+  };
+
+  const performGeneration = async (payload: GenerateRequestBody, appendMode: boolean) => {
+    const now = new Date().toISOString();
+    setLastStartedAt(now);
+
+    if (!appendMode) {
+      setContent("");
+    }
+
+    setError(null);
+    setStatus("generating");
+    setLastDeltaWords(0);
 
     const controller = new AbortController();
     abortControllerRef.current = controller;
@@ -49,6 +65,7 @@ export function useNovelGeneration() {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
+      let deltaWords = 0;
 
       while (true) {
         const { done, value } = await reader.read();
@@ -71,7 +88,9 @@ export function useNovelGeneration() {
           const data = trimmed.slice(5).trim();
 
           if (data === "[DONE]") {
-            setIsGenerating(false);
+            setStatus("completed");
+            setLastDeltaWords(deltaWords);
+            setLastCompletedAt(new Date().toISOString());
             abortControllerRef.current = null;
             return;
           }
@@ -83,6 +102,7 @@ export function useNovelGeneration() {
           }
 
           if (parsed.text) {
+            deltaWords += countWords(parsed.text);
             setContent((current) => current + parsed.text);
           }
         }
@@ -91,12 +111,24 @@ export function useNovelGeneration() {
       if (caughtError instanceof DOMException && caughtError.name === "AbortError") {
         setError(null);
       } else {
-        setError(caughtError instanceof Error ? caughtError.message : "生成过程中发生未知错误。");
+        const errorMsg = caughtError instanceof Error ? caughtError.message : "生成过程中发生未知错误。";
+        setError(errorMsg);
+        setStatus("error");
       }
     } finally {
       abortControllerRef.current = null;
-      setIsGenerating(false);
+      if (status === "generating") {
+        setStatus("completed");
+      }
     }
+  };
+
+  const startGeneration = async (payload: GenerateRequestBody) => {
+    await performGeneration(payload, false);
+  };
+
+  const continueGeneration = async (payload: GenerateRequestBody) => {
+    await performGeneration(payload, true);
   };
 
   const copyContent = async () => {
@@ -136,12 +168,18 @@ export function useNovelGeneration() {
   return {
     content,
     copyContent,
+    continueGeneration,
     downloadDocx,
     downloadTxt,
     error,
     isGenerating,
+    lastCompletedAt,
+    lastDeltaWords,
+    lastStartedAt,
     pauseGeneration,
+    resetContent,
     startGeneration,
+    status,
     wordCount: countWords(content),
   };
 }

@@ -46,14 +46,19 @@ export default function Home() {
     window.localStorage.setItem(STORAGE_KEYS.story, JSON.stringify(story));
   }, [story]);
 
-  const startGeneration = async (previousContent = "") => {
-    const payload = createGenerateRequest(config, story, previousContent);
+  const startGeneration = async () => {
+    const payload = createGenerateRequest(config, story, { content: "", title: "", summary: "", wordCount: 0, updatedAt: "" } as any, "start");
     await generation.startGeneration(payload);
+  };
+
+  const continueGeneration = async () => {
+    const payload = createGenerateRequest(config, story, { content: generation.content, title: "", summary: "", wordCount: generation.wordCount, updatedAt: "" } as any, "continue");
+    await generation.continueGeneration(payload);
   };
 
   const handleStorySubmit = async () => {
     setStep("generation");
-    await startGeneration("");
+    await startGeneration();
   };
 
   const activeIndex = steps.findIndex((item) => item.key === step);
@@ -145,18 +150,22 @@ export default function Home() {
               content={generation.content}
               error={generation.error}
               isGenerating={generation.isGenerating}
+              status={generation.status}
               targetWords={config.targetWords}
               wordCount={generation.wordCount}
+              lastDeltaWords={generation.lastDeltaWords}
+              lastStartedAt={generation.lastStartedAt}
               onBack={() => {
                 generation.pauseGeneration();
                 setStep("story");
               }}
               onCopy={generation.copyContent}
+              onContinue={continueGeneration}
               onDownloadDocx={() => generation.downloadDocx(story.bookTitle)}
               onDownloadTxt={() => generation.downloadTxt(story.bookTitle)}
               onPause={generation.pauseGeneration}
               onRestart={() => {
-                void startGeneration("");
+                void startGeneration();
               }}
             />
           )}

@@ -22,22 +22,13 @@ function extractTextFromChunk(payload: Record<string, unknown>) {
 export async function POST(request: NextRequest) {
   try {
     const body = (await request.json()) as GenerateRequestBody;
-    const {
-      apiUrl,
-      apiKey,
-      bookTitle,
-      mainCharacter,
-      model,
-      previousContent,
-      setting,
-      style,
-    } = body;
+    const { apiKey, apiUrl, bookTitle, mainCharacter, maxTokens, model, temperature } = body;
 
     if (!apiUrl || !apiKey || !model || !bookTitle || !mainCharacter) {
-      return NextResponse.json({ error: "缺少必要字段，请检查配置和故事信息。" }, { status: 400 });
+      return NextResponse.json({ error: "缺少必要字段，请检查配置和故事设定。" }, { status: 400 });
     }
 
-    const prompt = getNovelPrompt(style, bookTitle, mainCharacter, setting, previousContent);
+    const prompt = getNovelPrompt(body);
     const upstreamResponse = await fetch(apiUrl, {
       method: "POST",
       headers: {
@@ -46,10 +37,19 @@ export async function POST(request: NextRequest) {
       },
       body: JSON.stringify({
         model,
-        messages: [{ role: "user", content: prompt }],
+        messages: [
+          {
+            role: "system",
+            content: prompt.systemPrompt,
+          },
+          {
+            role: "user",
+            content: prompt.userPrompt,
+          },
+        ],
         stream: true,
-        max_tokens: 5000,
-        temperature: 0.9,
+        max_tokens: maxTokens,
+        temperature,
       }),
       cache: "no-store",
     });
