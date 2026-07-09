@@ -11,6 +11,9 @@ interface ConfigPanelProps {
 
 export function ConfigPanel({ config, onChange, onSubmit }: ConfigPanelProps) {
   const isDisabled = !config.apiUrl.trim() || !config.apiKey.trim() || !config.model.trim();
+  const selectedPreset = MODEL_PRESETS.find(
+    (preset) => preset.url === config.apiUrl && preset.model === config.model,
+  );
 
   const updateField = <Key extends keyof WriterConfig>(key: Key, value: WriterConfig[Key]) => {
     onChange({ ...config, [key]: value });
@@ -37,8 +40,12 @@ export function ConfigPanel({ config, onChange, onSubmit }: ConfigPanelProps) {
             <span className="text-sm font-medium text-slate-700">常用预设</span>
             <select
               className="rounded-2xl border border-amber-900/15 bg-white/80 px-4 py-3 outline-none transition focus:border-amber-500"
-              defaultValue=""
+              value={selectedPreset?.label || ""}
               onChange={(event) => {
+                if (!event.target.value) {
+                  return;
+                }
+
                 const preset = MODEL_PRESETS.find((item) => item.label === event.target.value);
 
                 if (!preset) {

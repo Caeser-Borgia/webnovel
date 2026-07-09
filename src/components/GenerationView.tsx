@@ -21,6 +21,7 @@ interface GenerationViewProps {
   hasSnapshot: boolean;
   onBack: () => void;
   onCreateChapter: () => void;
+  onDeleteChapter: (chapterId: string) => void;
   onSelectChapter: (chapterId: string) => void;
   onUpdateChapterTitle: (title: string) => void;
   onToggleAutoContinue: (next: boolean) => void;
@@ -76,6 +77,10 @@ function formatTime(value: string | null) {
   });
 }
 
+function buildChapterFallbackTitle(title: string | null | undefined) {
+  return title?.trim() || "未命名章节";
+}
+
 export function GenerationView({
   bookTitle,
   chapters,
@@ -94,6 +99,7 @@ export function GenerationView({
   hasSnapshot,
   onBack,
   onCreateChapter,
+  onDeleteChapter,
   onSelectChapter,
   onUpdateChapterTitle,
   onToggleAutoContinue,
@@ -122,6 +128,11 @@ export function GenerationView({
     contentRef.current.scrollTop = contentRef.current.scrollHeight;
   }, [content]);
 
+  const activeChapter = useMemo(
+    () => chapters.find((chapter) => chapter.id === activeChapterId) || null,
+    [activeChapterId, chapters],
+  );
+
   const progress = useMemo(() => {
     if (!targetWords) {
       return 0;
@@ -138,11 +149,11 @@ export function GenerationView({
   if (!chapters.length) {
     return (
       <div className="panel-strong rounded-[28px] p-6 sm:p-8">
-        <div className="rounded-[24px] border border-dashed border-amber-900/20 bg-white/50 px-6 py-12 text-center">
+        <div className="rounded-[28px] border border-dashed border-amber-900/20 bg-white/55 px-6 py-12 text-center">
           <div className="text-sm uppercase tracking-[0.24em] text-amber-800/70">Step 3</div>
           <h2 className="mt-3 text-3xl font-semibold text-slate-900">先创建第一章</h2>
           <p className="mt-3 text-sm leading-7 text-slate-600">
-            现在已经进入创作阶段，但还没有章节。先建一个章节，再开始生成或续写。
+            现在已经进入创作阶段，但还没有章节。先新建一章，再开始生成、续写或导出。
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-3">
             <button
@@ -167,9 +178,9 @@ export function GenerationView({
 
   return (
     <div className="panel-strong rounded-[28px] p-4 sm:p-6">
-      <div className="grid gap-4 lg:grid-cols-[260px_1fr]">
-        <aside className="rounded-[24px] border border-amber-900/10 bg-white/55 p-4">
-          <div className="flex items-center justify-between">
+      <div className="grid gap-4 xl:grid-cols-[300px_1fr]">
+        <aside className="rounded-[26px] border border-amber-900/10 bg-white/60 p-4 shadow-sm shadow-amber-950/5">
+          <div className="flex items-start justify-between gap-3">
             <div>
               <div className="text-sm font-medium text-slate-900">章节列表</div>
               <div className="mt-1 text-xs text-slate-500">总字数 {totalBookWords.toLocaleString()}</div>
@@ -191,39 +202,58 @@ export function GenerationView({
               return (
                 <button
                   key={chapter.id}
-                  className={`rounded-[20px] border px-4 py-3 text-left transition ${
+                  className={`rounded-[22px] border px-4 py-3 text-left transition ${
                     isActive
-                      ? "border-amber-500 bg-amber-50/80 shadow-sm shadow-amber-950/5"
-                      : "border-amber-900/10 bg-white/80 hover:border-amber-300"
+                      ? "border-amber-500 bg-amber-50/90 shadow-sm shadow-amber-950/5"
+                      : "border-amber-900/10 bg-white/85 hover:border-amber-300"
                   }`}
                   disabled={isGenerating}
                   type="button"
                   onClick={() => onSelectChapter(chapter.id)}
                 >
-                  <div className="text-sm font-medium text-slate-900">{chapter.title || "未命名章节"}</div>
-                  <div className="mt-2 text-xs text-slate-500">
-                    {chapter.wordCount.toLocaleString()} 字 · {getStatusLabel(chapter.status)}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-medium text-slate-900">
+                        {buildChapterFallbackTitle(chapter.title)}
+                      </div>
+                      <div className="mt-1 text-xs text-slate-500">
+                        {chapter.wordCount.toLocaleString()} 字 · {getStatusLabel(chapter.status)}
+                      </div>
+                    </div>
+                    <button
+                      className="rounded-full border border-rose-200 bg-white px-3 py-1 text-[11px] font-medium text-rose-600 transition hover:border-rose-300 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      disabled={isGenerating}
+                      type="button"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onDeleteChapter(chapter.id);
+                      }}
+                    >
+                      删除
+                    </button>
                   </div>
+                  <div className="mt-2 max-h-10 overflow-hidden text-xs leading-5 text-slate-500">
+                    {chapter.summary.trim() || "暂无摘要，生成后会自动更新。"}
+                  </div>
+                  <div className="mt-2 text-[11px] text-slate-400">{formatTime(chapter.updatedAt)}</div>
                 </button>
               );
             })}
           </div>
         </aside>
 
-        <section className="rounded-[24px] border border-amber-900/10 bg-white/50 p-5 sm:p-6">
-          <div className="flex flex-col gap-4 border-b border-amber-900/10 pb-6">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <section className="rounded-[26px] border border-amber-900/10 bg-white/55 p-5 sm:p-6">
+          <div className="flex flex-col gap-5 border-b border-amber-900/10 pb-6">
+            <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
               <div>
                 <div className="text-sm uppercase tracking-[0.24em] text-amber-800/70">Step 3</div>
-                <h2 className="mt-2 text-3xl font-semibold text-slate-900">
-                  {bookTitle || "未命名作品"}
-                </h2>
-                <p className="mt-3 text-sm leading-7 text-slate-600">
-                  当前章节支持重新开始、继续创作、暂停、导出和快照恢复。
+                <h2 className="mt-2 text-3xl font-semibold text-slate-900">{bookTitle || "未命名作品"}</h2>
+                <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600">
+                  在这里可以生成、续写、暂停、重写和导出单章或全书；每个章节都会独立保存内容、摘要和状态。
                 </p>
               </div>
 
-              <label className="flex items-center gap-3 rounded-2xl border border-amber-900/10 bg-white/80 px-4 py-3 text-sm text-slate-700">
+              <label className="flex items-center gap-3 rounded-2xl border border-amber-900/10 bg-white/85 px-4 py-3 text-sm text-slate-700">
                 <input
                   checked={autoContinueToTarget}
                   className="h-4 w-4 accent-amber-500"
@@ -235,28 +265,32 @@ export function GenerationView({
             </div>
 
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              <div className="rounded-3xl border border-amber-900/10 bg-white/80 px-5 py-4 text-sm text-slate-600">
+              <div className="rounded-3xl border border-amber-900/10 bg-white/85 px-5 py-4">
                 <div className="text-xs uppercase tracking-[0.2em] text-slate-500">当前状态</div>
                 <div className="mt-2 text-lg font-medium text-slate-900">{getStatusLabel(status)}</div>
                 <div className="mt-1 text-xs text-slate-500">本轮模式：{getModeLabel(currentMode)}</div>
               </div>
 
-              <div className="rounded-3xl border border-amber-900/10 bg-white/80 px-5 py-4 text-sm text-slate-600">
+              <div className="rounded-3xl border border-amber-900/10 bg-white/85 px-5 py-4">
                 <div className="text-xs uppercase tracking-[0.2em] text-slate-500">当前字数</div>
                 <div className="mt-2 text-lg font-medium text-slate-900">{wordCount.toLocaleString()}</div>
                 <div className="mt-1 text-xs text-slate-500">目标字数：{targetWords.toLocaleString()}</div>
               </div>
 
-              <div className="rounded-3xl border border-amber-900/10 bg-white/80 px-5 py-4 text-sm text-slate-600">
+              <div className="rounded-3xl border border-amber-900/10 bg-white/85 px-5 py-4">
                 <div className="text-xs uppercase tracking-[0.2em] text-slate-500">本轮新增</div>
                 <div className="mt-2 text-lg font-medium text-slate-900">{lastDeltaWords.toLocaleString()}</div>
-                <div className="mt-1 text-xs text-slate-500">自动续写：{autoContinueToTarget ? "开启" : "关闭"}</div>
+                <div className="mt-1 text-xs text-slate-500">
+                  {autoContinueToTarget ? "自动续写已开启" : "自动续写已关闭"}
+                </div>
               </div>
 
-              <div className="rounded-3xl border border-amber-900/10 bg-white/80 px-5 py-4 text-sm text-slate-600">
-                <div className="text-xs uppercase tracking-[0.2em] text-slate-500">开始时间</div>
+              <div className="rounded-3xl border border-amber-900/10 bg-white/85 px-5 py-4">
+                <div className="text-xs uppercase tracking-[0.2em] text-slate-500">最近启动</div>
                 <div className="mt-2 text-sm font-medium text-slate-900">{formatTime(lastStartedAt)}</div>
-                <div className="mt-1 text-xs text-slate-500">当前章节：{activeChapterTitle || "未命名章节"}</div>
+                <div className="mt-1 text-xs text-slate-500">
+                  当前章节：{activeChapter ? buildChapterFallbackTitle(activeChapter.title) : "未命名章节"}
+                </div>
               </div>
             </div>
           </div>
@@ -297,7 +331,7 @@ export function GenerationView({
             className="mt-6 min-h-[420px] rounded-[28px] border border-amber-900/10 bg-slate-950 px-5 py-5 font-[family-name:var(--font-geist-mono)] text-sm leading-7 text-slate-100"
           >
             <div className="whitespace-pre-wrap">
-              {content || "当前章节还没有正文。你可以先点“开始生成本章”，也可以先调整章节标题和设定。"}
+              {content || "当前章节还没有正文。先点击“开始生成本章”，也可以先调整标题和故事设定。"}
             </div>
           </div>
 

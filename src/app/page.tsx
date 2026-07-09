@@ -4,6 +4,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ConfigPanel } from "@/components/ConfigPanel";
 import { GenerationView } from "@/components/GenerationView";
 import { StorySetup } from "@/components/StorySetup";
+import { CharacterManager } from "@/components/CharacterManager";
+import { PlotManager } from "@/components/PlotManager";
+import { GenerationParams } from "@/components/GenerationParams";
 import { useNovelGeneration } from "@/hooks/useNovelGeneration";
 import {
   buildBookMarkdown,
@@ -96,32 +99,44 @@ export default function Home() {
     const savedProject = window.localStorage.getItem(STORAGE_KEYS.project);
 
     if (savedConfig) {
-      setConfig((current) => ({ ...current, ...JSON.parse(savedConfig) }));
+      try {
+        setConfig((current) => ({ ...current, ...JSON.parse(savedConfig) }));
+      } catch (e) {
+        console.warn("Failed to parse saved config, using defaults");
+      }
     }
 
     if (savedStory) {
-      setStory((current) => ({ ...current, ...JSON.parse(savedStory) }));
+      try {
+        setStory((current) => ({ ...current, ...JSON.parse(savedStory) }));
+      } catch (e) {
+        console.warn("Failed to parse saved story, using defaults");
+      }
     }
 
     if (savedProject) {
-      const parsed = JSON.parse(savedProject) as Partial<StoredProjectData>;
-      const nextChapters = Array.isArray(parsed.chapters)
-        ? parsed.chapters.map((chapter, index) => normalizeChapter(chapter, index))
-        : [];
-      const nextSnapshots = Array.isArray(parsed.snapshots)
-        ? parsed.snapshots.map(normalizeSnapshot).filter(Boolean) as DraftSnapshot[]
-        : [];
+      try {
+        const parsed = JSON.parse(savedProject) as Partial<StoredProjectData>;
+        const nextChapters = Array.isArray(parsed.chapters)
+          ? parsed.chapters.map((chapter, index) => normalizeChapter(chapter, index))
+          : [];
+        const nextSnapshots = Array.isArray(parsed.snapshots)
+          ? parsed.snapshots.map(normalizeSnapshot).filter(Boolean) as DraftSnapshot[]
+          : [];
 
-      setChapters(nextChapters);
-      setSnapshots(nextSnapshots);
-      setActiveChapterId(parsed.activeChapterId || nextChapters[0]?.id || null);
+        setChapters(nextChapters);
+        setSnapshots(nextSnapshots);
+        setActiveChapterId(parsed.activeChapterId || nextChapters[0]?.id || null);
 
-      if (Array.isArray(parsed.characters)) {
-        setCharacters(parsed.characters);
-      }
+        if (Array.isArray(parsed.characters)) {
+          setCharacters(parsed.characters);
+        }
 
-      if (Array.isArray(parsed.plots)) {
-        setPlots(parsed.plots);
+        if (Array.isArray(parsed.plots)) {
+          setPlots(parsed.plots);
+        }
+      } catch (e) {
+        console.warn("Failed to parse saved project, using defaults");
       }
     }
   }, []);
@@ -168,6 +183,16 @@ export default function Home() {
   const latestSnapshot = useMemo(
     () => snapshots.find((snapshot) => snapshot.chapterId === activeChapterId) || null,
     [activeChapterId, snapshots],
+  );
+
+  const totalWordCount = useMemo(
+    () => chapters.reduce((sum, chapter) => sum + chapter.wordCount, 0),
+    [chapters],
+  );
+
+  const completedChapterCount = useMemo(
+    () => chapters.filter((chapter) => chapter.status === "completed").length,
+    [chapters],
   );
 
   useEffect(() => {
@@ -365,6 +390,40 @@ export default function Home() {
     setStep("generation");
   };
 
+  const handleDeleteChapter = (chapterId: string) => {
+    if (generation.isGenerating) {
+      return;
+    }
+
+    const targetChapter = chaptersRef.current.find((chapter) => chapter.id === chapterId);
+
+    if (!targetChapter) {
+      return;
+    }
+
+    const confirmed = window.confirm(`确定删除章节「${targetChapter.title || "未命名章节"}」吗？`);
+
+    if (!confirmed) {
+      return;
+    }
+
+    setChapters((current) => {
+      const currentIndex = current.findIndex((chapter) => chapter.id === chapterId);
+      const nextChapters = current.filter((chapter) => chapter.id !== chapterId);
+
+      if (nextChapters.length === 0) {
+        setActiveChapterId(null);
+      } else if (activeChapterIdRef.current === chapterId) {
+        const fallback = nextChapters[currentIndex] || nextChapters[currentIndex - 1] || nextChapters[0];
+        setActiveChapterId(fallback.id);
+      }
+
+      return nextChapters;
+    });
+
+    setSnapshots((current) => current.filter((snapshot) => snapshot.chapterId !== chapterId));
+  };
+
   const handleSaveSnapshot = () => {
     if (!activeChapter || !activeChapter.content.trim()) {
       return;
@@ -468,6 +527,34 @@ export default function Home() {
                 "按章节生成、续写、重写、导出和保存快照，正文会自动保存在本地。"}
             </p>
           </div>
+
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded-3xl border border-white/10 bg-white/5 px-5 py-4">
+              <div className="text-xs uppercase tracking-[0.2em] text-slate-400">章节数量</div>
+              <div className="mt-2 text-2xl font-semibold text-white">{chapters.length}</div>
+              <div className="mt-1 text-xs text-slate-300">已完成 {completedChapterCount} 章</div>
+            </div>
+
+            <div className="rounded-3xl border border-white/10 bg-white/5 px-5 py-4">
+              <div className="text-xs uppercase tracking-[0.2em] text-slate-400">全书字数</div>
+              <div className="mt-2 text-2xl font-semibold text-white">{totalWordCount.toLocaleString()}</div>
+              <div className="mt-1 text-xs text-slate-300">本地自动保存</div>
+            </div>
+
+            <div className="rounded-3xl border border-white/10 bg-white/5 px-5 py-4">
+              <div className="text-xs uppercase tracking-[0.2em] text-slate-400">快照数量</div>
+              <div className="mt-2 text-2xl font-semibold text-white">{snapshots.length}</div>
+              <div className="mt-1 text-xs text-slate-300">最近版本可恢复</div>
+            </div>
+
+            <div className="rounded-3xl border border-white/10 bg-white/5 px-5 py-4">
+              <div className="text-xs uppercase tracking-[0.2em] text-slate-400">自动续写</div>
+              <div className="mt-2 text-2xl font-semibold text-white">
+                {config.autoContinueToTarget ? "开启" : "关闭"}
+              </div>
+              <div className="mt-1 text-xs text-slate-300">目标字数 {config.targetWords.toLocaleString()}</div>
+            </div>
+          </div>
         </section>
 
         <section className="panel rounded-[28px] p-4 sm:p-6">
@@ -491,7 +578,8 @@ export default function Home() {
           )}
 
           {step === "generation" && (
-            <GenerationView
+            <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
+              <GenerationView
               activeChapterId={activeChapterId}
               activeChapterTitle={activeChapter?.title || ""}
               autoContinueToTarget={config.autoContinueToTarget}
@@ -518,6 +606,7 @@ export default function Home() {
               onCopyAll={() => generation.copyText(allBookText)}
               onCopyCurrent={() => generation.copyText(currentChapterText)}
               onCreateChapter={handleCreateChapter}
+              onDeleteChapter={handleDeleteChapter}
               onDownloadAllDocx={() =>
                 generation.downloadDocx(
                   story.bookTitle || "webnovel-story",
@@ -570,6 +659,22 @@ export default function Home() {
                 }));
               }}
             />
+
+            <aside className="space-y-4 sticky top-8 max-h-[calc(100vh-128px)] overflow-y-auto">
+              <GenerationParams
+                config={config}
+                onChange={setConfig}
+              />
+              <CharacterManager
+                characters={characters}
+                onChange={setCharacters}
+              />
+              <PlotManager
+                plots={plots}
+                onChange={setPlots}
+              />
+            </aside>
+            </div>
           )}
         </section>
       </div>

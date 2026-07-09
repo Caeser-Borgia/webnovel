@@ -1,14 +1,7 @@
 "use client";
 
 import { useState } from "react";
-
-interface CharacterCard {
-  id: string;
-  name: string;
-  role: string; // 主角、主配角、重要配角
-  description: string;
-  status: string; // 当前状态、关系变化
-}
+import type { CharacterCard } from "@/types";
 
 interface CharacterManagerProps {
   characters: CharacterCard[];
@@ -26,6 +19,7 @@ export function CharacterManager({ characters, onChange }: CharacterManagerProps
       role: "重要配角",
       description: "",
       status: "",
+      relationships: "",
     };
     onChange([...characters, newCharacter]);
     setEditingId(newCharacter.id);
@@ -66,7 +60,7 @@ export function CharacterManager({ characters, onChange }: CharacterManagerProps
               还没有添加角色卡。建议为重要角色添加档案，确保长篇写作中角色的一致性。
             </div>
           ) : (
-            <div className="grid gap-2 max-h-64 overflow-y-auto">
+            <div className="grid gap-2 max-h-[200px] sm:max-h-[240px] overflow-y-auto">
               {characters.map((character) => (
                 <div
                   key={character.id}
@@ -90,7 +84,7 @@ export function CharacterManager({ characters, onChange }: CharacterManagerProps
                         className="w-full rounded-lg border border-amber-900/15 bg-white px-3 py-2 text-sm outline-none focus:border-amber-500"
                         value={character.role}
                         onChange={(e) =>
-                          updateCharacter(character.id, { role: e.target.value })
+                          updateCharacter(character.id, { role: e.target.value as CharacterCard["role"] })
                         }
                       >
                         <option value="主角">主角</option>
@@ -112,6 +106,14 @@ export function CharacterManager({ characters, onChange }: CharacterManagerProps
                         value={character.status}
                         onChange={(e) =>
                           updateCharacter(character.id, { status: e.target.value })
+                        }
+                      />
+                      <textarea
+                        className="w-full min-h-12 rounded-lg border border-amber-900/15 bg-white px-3 py-2 text-sm outline-none focus:border-amber-500"
+                        placeholder="与其他角色的关系"
+                        value={character.relationships}
+                        onChange={(e) =>
+                          updateCharacter(character.id, { relationships: e.target.value })
                         }
                       />
                       <div className="flex gap-2">

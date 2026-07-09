@@ -1,15 +1,7 @@
 "use client";
 
 import { useState } from "react";
-
-interface PlotPoint {
-  id: string;
-  title: string;
-  type: "大纲" | "伏笔" | "情节" | "悬念";
-  description: string;
-  resolved: boolean; // 是否已交代
-  chapter: string; // 出现或应该出现的章节
-}
+import type { PlotPoint } from "@/types";
 
 interface PlotManagerProps {
   plots: PlotPoint[];
@@ -74,7 +66,7 @@ export function PlotManager({ plots, onChange }: PlotManagerProps) {
               记录故事大纲、伏笔和悬念，确保长篇创作不遗漏关键情节。
             </div>
           ) : (
-            <div className="grid gap-2 max-h-72 overflow-y-auto">
+            <div className="grid gap-2 max-h-[200px] sm:max-h-[240px] overflow-y-auto">
               {plots.map((plot) => (
                 <div
                   key={plot.id}

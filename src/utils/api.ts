@@ -14,7 +14,7 @@ export const MODEL_PRESETS: ModelPreset[] = [
   {
     label: "DeepSeek",
     url: "https://api.deepseek.com/chat/completions",
-    model: "deepseek-chat",
+    model: "deepseek-v4-flash",
   },
   {
     label: "Claude 兼容代理",

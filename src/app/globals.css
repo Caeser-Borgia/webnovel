@@ -61,4 +61,26 @@ textarea {
     background: var(--panel-strong);
     border: 1px solid rgba(120, 53, 15, 0.18);
   }
+
+  .sidebar-safe {
+    @apply sticky top-8 max-h-[calc(100vh-128px)] overflow-y-auto;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: rgba(120, 53, 15, 0.05);
+    border-radius: 10px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: rgba(120, 53, 15, 0.2);
+    border-radius: 10px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: rgba(120, 53, 15, 0.3);
+  }
 }
