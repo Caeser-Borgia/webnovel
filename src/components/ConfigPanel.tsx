@@ -66,6 +66,9 @@ export function ConfigPanel({ config, onChange, onSubmit }: ConfigPanelProps) {
                 </option>
               ))}
             </select>
+            <div className="text-xs text-slate-500">
+              当前预设：{selectedPreset?.label || "自定义"} · {config.model || "未填写模型"}
+            </div>
           </label>
 
           <label className="grid gap-2">

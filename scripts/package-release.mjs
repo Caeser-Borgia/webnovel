@@ -6,7 +6,7 @@ const rootDir = process.cwd();
 const standaloneDir = path.join(rootDir, ".next", "standalone");
 const staticDir = path.join(rootDir, ".next", "static");
 const publicDir = path.join(rootDir, "public");
-const releaseDir = path.join(rootDir, "release");
+const releaseDir = path.join(rootDir, "webnovel-v1.0.0");
 const bundledNode = "C:\\Users\\ASUS\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\node\\bin\\node.exe";
 
 async function exists(target) {

@@ -72,9 +72,7 @@ function formatTime(value: string | null) {
     return "暂无";
   }
 
-  return new Date(value).toLocaleString("zh-CN", {
-    hour12: false,
-  });
+  return new Date(value).toLocaleString("zh-CN", { hour12: false });
 }
 
 function buildChapterFallbackTitle(title: string | null | undefined) {
@@ -200,18 +198,20 @@ export function GenerationView({
               const isActive = chapter.id === activeChapterId;
 
               return (
-                <button
+                <div
                   key={chapter.id}
-                  className={`rounded-[22px] border px-4 py-3 text-left transition ${
+                  className={`rounded-[22px] border px-4 py-3 transition ${
                     isActive
                       ? "border-amber-500 bg-amber-50/90 shadow-sm shadow-amber-950/5"
                       : "border-amber-900/10 bg-white/85 hover:border-amber-300"
                   }`}
-                  disabled={isGenerating}
-                  type="button"
-                  onClick={() => onSelectChapter(chapter.id)}
                 >
-                  <div className="flex items-start justify-between gap-3">
+                  <button
+                    className="w-full text-left"
+                    disabled={isGenerating}
+                    type="button"
+                    onClick={() => onSelectChapter(chapter.id)}
+                  >
                     <div className="min-w-0">
                       <div className="truncate text-sm font-medium text-slate-900">
                         {buildChapterFallbackTitle(chapter.title)}
@@ -220,23 +220,22 @@ export function GenerationView({
                         {chapter.wordCount.toLocaleString()} 字 · {getStatusLabel(chapter.status)}
                       </div>
                     </div>
+                    <div className="mt-2 max-h-10 overflow-hidden text-xs leading-5 text-slate-500">
+                      {chapter.summary.trim() || "暂无摘要，生成后会自动更新。"}
+                    </div>
+                    <div className="mt-2 text-[11px] text-slate-400">{formatTime(chapter.updatedAt)}</div>
+                  </button>
+                  <div className="mt-3 flex justify-end">
                     <button
                       className="rounded-full border border-rose-200 bg-white px-3 py-1 text-[11px] font-medium text-rose-600 transition hover:border-rose-300 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
                       disabled={isGenerating}
                       type="button"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onDeleteChapter(chapter.id);
-                      }}
+                      onClick={() => onDeleteChapter(chapter.id)}
                     >
                       删除
                     </button>
                   </div>
-                  <div className="mt-2 max-h-10 overflow-hidden text-xs leading-5 text-slate-500">
-                    {chapter.summary.trim() || "暂无摘要，生成后会自动更新。"}
-                  </div>
-                  <div className="mt-2 text-[11px] text-slate-400">{formatTime(chapter.updatedAt)}</div>
-                </button>
+                </div>
               );
             })}
           </div>

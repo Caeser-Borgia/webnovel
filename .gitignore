@@ -39,3 +39,6 @@ next-env.d.ts
 /release/
 /scripts/
 *.bat
+
+# standalone release package
+/webnovel-v1.0.0/
